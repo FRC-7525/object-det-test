@@ -27,6 +27,7 @@ public class Robot extends TimedRobot {
   public void robotPeriodic() {
 		CommandScheduler.getInstance().run();
     Vision.getInstance().periodic();
+    Drive.getInstance().periodic();
   }
 
   @Override

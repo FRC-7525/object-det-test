@@ -17,7 +17,7 @@ public class Vision extends SubsystemBase {
 
     public static Vision getInstance() {
         if (instance == null) {
-            instance = new Vision(FRONT_LEFT_CAM_NAME);
+            instance = new Vision(FRONT_RIGHT_CAM_NAME);
         }
 
         return instance;
@@ -38,7 +38,10 @@ public class Vision extends SubsystemBase {
         for (var result : results) {
             var target = result.getBestTarget();
 
-            if (target != null) targetYaw = Degrees.of(target.getYaw());
+            if (target != null) {
+                targetYaw = Degrees.of(target.getYaw());
+                System.out.println(targetYaw.in(Degrees));
+            }
         }
     }
 }

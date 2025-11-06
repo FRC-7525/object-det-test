@@ -5,6 +5,9 @@ import static frc.robot.GlobalConstants.*;
 import static frc.robot.GlobalConstants.Controllers.*;
 import static frc.robot.Subsystems.Drive.DriveConstants.*;
 import static frc.robot.Subsystems.Drive.TunerConstants.kSpeedAt12Volts;
+import static frc.robot.Subsystems.Vision.VisionConstants.*;
+
+import java.util.Vector;
 
 import com.ctre.phoenix6.Utils;
 import com.ctre.phoenix6.swerve.SwerveDrivetrain.SwerveDriveState;
@@ -13,9 +16,14 @@ import com.ctre.phoenix6.swerve.SwerveRequest;
 import edu.wpi.first.math.Matrix;
 import edu.wpi.first.math.controller.PIDController;
 import edu.wpi.first.math.geometry.Pose2d;
+import edu.wpi.first.math.geometry.Rotation3d;
+import edu.wpi.first.math.geometry.Transform3d;
+import edu.wpi.first.math.geometry.Translation2d;
+import edu.wpi.first.math.geometry.Translation3d;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.math.numbers.N1;
 import edu.wpi.first.math.numbers.N3;
+import edu.wpi.first.math.numbers.N4;
 import edu.wpi.first.math.util.Units;
 import edu.wpi.first.units.measure.LinearVelocity;
 import edu.wpi.first.wpilibj.DriverStation;
@@ -96,8 +104,15 @@ public class Drive extends Subsystem<DriveStates> {
 		if (!DRIVER_CONTROLLER.getAButton()) {
 			getState().driveRobot();
 		} else {
-			if (vision.getYawToTarget() != null) {
-				driveFieldRelative(0, 0, thetaController.calculate(getDriveTrain().getPigeon2().getYaw().getValueAsDouble() % 360, vision.getYawToTarget().in(Degree)));
+			if (vision.getYawToTarget() != null) 
+			{
+				Matrix<N4, N4> robotToFRMatrix = ROBOT_TO_FRONT_RIGHT_CAMERA.div(ROBOT_TO_FRONT_RIGHT_CAMERA.getTranslation().getNorm()).toMatrix();
+				Matrix<N4, N4> cameraToObj= new Transform3d(Translation3d.kZero, new Rotation3d(0,0, vision.getYawToTarget().in(Radians))).toMatrix();
+				Matrix<N4, N4> robotToObj = robotToFRMatrix.times(robotToFRMatrix.inv()).times(cameraToObj);
+				double currentAngle = getDriveTrain().getPigeon2().getYaw().getValueAsDouble() % 360;
+				// double wantedAngle = currentAngle - (vision.getYawToTarget().in(Degree) + ROBOT_TO_FRONT_RIGHT_CAMERA_ROTATION.getZ());
+
+				driveFieldRelative(0, 0,  .1 * thetaController.calculate(currentAngle, new Transform3d(robotToObj).getRotation().getMeasureZ().in(Degree)));
 			}
 		}
 

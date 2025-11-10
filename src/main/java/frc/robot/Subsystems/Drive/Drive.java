@@ -106,9 +106,9 @@ public class Drive extends Subsystem<DriveStates> {
 		} else {
 			if (vision.getYawToTarget() != null) 
 			{
-				Matrix<N4, N4> robotToFRMatrix = ROBOT_TO_FRONT_RIGHT_CAMERA.div(ROBOT_TO_FRONT_RIGHT_CAMERA.getTranslation().getNorm()).toMatrix();
+				Matrix<N4, N4> robotToFRMatrix = ROBOT_TO_FRONT_RIGHT_CAMERA.toMatrix();
 				Matrix<N4, N4> cameraToObj= new Transform3d(Translation3d.kZero, new Rotation3d(0,0, vision.getYawToTarget().in(Radians))).toMatrix();
-				Matrix<N4, N4> robotToObj = robotToFRMatrix.times(robotToFRMatrix.inv()).times(cameraToObj);
+				Matrix<N4, N4> robotToObj = robotToFRMatrix.times(cameraToObj);
 				double currentAngle = getDriveTrain().getPigeon2().getYaw().getValueAsDouble() % 360;
 				// double wantedAngle = currentAngle - (vision.getYawToTarget().in(Degree) + ROBOT_TO_FRONT_RIGHT_CAMERA_ROTATION.getZ());
 

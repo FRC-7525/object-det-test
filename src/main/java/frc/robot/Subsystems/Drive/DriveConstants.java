@@ -11,7 +11,6 @@ import edu.wpi.first.units.measure.AngularVelocity;
 import edu.wpi.first.units.measure.Distance;
 import edu.wpi.first.units.measure.LinearAcceleration;
 import edu.wpi.first.units.measure.LinearVelocity;
-import frc.robot.Subsystems.Drive.Drive.SysIdMode;
 
 public class DriveConstants {
 
@@ -35,8 +34,6 @@ public class DriveConstants {
 
 	public static final LinearVelocity TIPPING_LIMITER_THRESHOLD = MetersPerSecond.of(3);
 
-	// Change to change the sysID test that gets run for drive
-	public static final SysIdMode SYS_ID_MODE = SysIdMode.STEER;
 	public static final String SUBSYSTEM_NAME = "Drive";
 
 	// For zeroing on robot init

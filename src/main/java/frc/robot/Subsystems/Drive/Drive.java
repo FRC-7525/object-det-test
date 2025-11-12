@@ -101,21 +101,12 @@ public class Drive extends Subsystem<DriveStates> {
 		}
 		logOutputs(driveIO.getDrive().getState());
 		
-		if (!DRIVER_CONTROLLER.getAButton()) {
-			getState().driveRobot();
-		} else {
-			if (vision.getYawToTarget() != null) 
-			{
-				Matrix<N4, N4> robotToFRMatrix = ROBOT_TO_FRONT_RIGHT_CAMERA.toMatrix();
-				Matrix<N4, N4> cameraToObj= new Transform3d(Translation3d.kZero, new Rotation3d(0,0, vision.getYawToTarget().in(Radians))).toMatrix();
-				Matrix<N4, N4> robotToObj = robotToFRMatrix.times(cameraToObj);
-				double currentAngle = getDriveTrain().getPigeon2().getYaw().getValueAsDouble() % 360;
-				// double wantedAngle = currentAngle - (vision.getYawToTarget().in(Degree) + ROBOT_TO_FRONT_RIGHT_CAMERA_ROTATION.getZ());
 
-				driveFieldRelative(0, 0,  .1 * thetaController.calculate(currentAngle, new Transform3d(robotToObj).getRotation().getMeasureZ().in(Degree)));
-			}
-		}
 
+
+
+		
+	
 		field.setRobotPose(getPose());
 		SmartDashboard.putData("Field", field);
 	}
@@ -153,13 +144,6 @@ public class Drive extends Subsystem<DriveStates> {
 		driveIO.zeroGyro();
 	}
 
-	// SYSId Trash (no hate ofc)
-	public enum SysIdMode {
-		TRANSLATION,
-		STEER,
-		ROTATION,
-	}
-
 	// Util
 	public Pose2d getPose() {
 		return driveIO.getDrive().getState().Pose;
@@ -175,13 +159,5 @@ public class Drive extends Subsystem<DriveStates> {
 
 	public TunerSwerveDrivetrain getDriveTrain() {
 		return driveIO.getDrive();
-	}
-
-	public void addVisionMeasurement(Pose2d visionPose, double timestamp, Matrix<N3, N1> visionMeasurementStdDevs) {
-		if (ROBOT_MODE == RobotMode.REAL) {
-			driveIO.addVisionMeasurement(visionPose, Utils.fpgaToCurrentTime(timestamp), visionMeasurementStdDevs);
-		} else {
-			driveIO.addVisionMeasurement(visionPose, timestamp, visionMeasurementStdDevs);
-		}
 	}
 }

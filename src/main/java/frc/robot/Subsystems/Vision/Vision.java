@@ -13,8 +13,8 @@ public class Vision extends SubsystemBase {
     private PhotonCamera camera;
     private static Vision instance;
 
-    private Angle targetYaw;
-
+    private Angle targetYaw; 
+    
     public static Vision getInstance() {
         if (instance == null) {
             instance = new Vision(FRONT_RIGHT_CAM_NAME);
@@ -41,7 +41,6 @@ public class Vision extends SubsystemBase {
             if (target != null) {
                 targetYaw = Degrees.of(target.getYaw());
                 System.out.println(targetYaw.in(Degrees));
-            }
         }
     }
 }

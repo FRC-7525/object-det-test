@@ -1,6 +1,7 @@
 package frc.robot.Subsystems.GamePieceFinder;
 
 import static edu.wpi.first.units.Units.*;
+import static frc.robot.Subsystems.Vision.VisionConstants.*;
 
 import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
@@ -8,6 +9,8 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.photonvision.targeting.PhotonTrackedTarget;
 
 import edu.wpi.first.math.geometry.*;
+import edu.wpi.first.units.measure.Angle;
+import edu.wpi.first.units.measure.Distance;
 import edu.wpi.first.units.measure.Time;
 import frc.robot.Subsystems.Drive.Drive;
 
@@ -27,7 +30,7 @@ public class GamePieceFinder {
 
     private Pose2d latestEstimate;
 
-    private record Ray2d(Translation2d origin, Translation2d dir, double length, double area) {}
+    private record Ray2d(Translation2d origin, Translation2d dir, double length, double area, Angle measuredAngle, Pose2d robotPose) {}
 
     private class GamePieceParallaxSample {
         public final Pose2d robotPose;
@@ -50,7 +53,7 @@ public class GamePieceFinder {
             double globalAngle = robotPose.getRotation().getRadians() + Math.toRadians(yawDeg);
             Translation2d dir = new Translation2d(Math.cos(globalAngle), Math.sin(globalAngle));
 
-            return new Ray2d(cameraPos, dir, distance, visionSample.getArea());
+            return new Ray2d(cameraPos, dir, distance, visionSample.getArea(), Degrees.of(yawDeg), robotPose);
         }
     }
 
@@ -91,21 +94,23 @@ public class GamePieceFinder {
 
         for (int i = 0; i < samples.size(); i++) {
             for (int j = i + 1; j < samples.size(); j++) {
-                var s1 = samples.get(i);
-                var s2 = samples.get(j);
+                //I need the "first" sample to have the smaller rotation so that I can set it as 0 and go off of that for calculations
+                //TODO: Logic will mess up if rotation can be negative, so need to confirm that its not/deal with it if it is
+                //TODO: Probably better way to implement this logic lol
+                var s1 = samples.get(i).robotPose.getRotation().getDegrees() < samples.get(j).robotPose.getRotation().getDegrees() ? samples.get(i) : samples.get(j);
+                var s2 = samples.get(i).robotPose.getRotation().getDegrees() > samples.get(j).robotPose.getRotation().getDegrees() ? samples.get(i) : samples.get(j);
 
-                double yawDiff = Math.abs(s1.visionSample.getYaw() - s2.visionSample.getYaw());
+                double yawDiff = Math.abs(s2.visionSample.getYaw() - s1.visionSample.getYaw());
                 if (yawDiff < MIN_YAW_DIFFERENCE_DEG) continue;
 
                 Ray2d r1 = s1.toRay();
                 Ray2d r2 = s2.toRay();
 
-                Optional<Translation2d> intersection = intersectRays(r1, r2);
+                Translation2d objectPoint = getPoseThroughParallax(r1, r2);
                 // Chat will it continue if the first condition isnt met and then leave my thingy that might get a null pointer alone
-                if (intersection.isPresent() &&
-                   areasAtIntersection(r1, r2, intersection.get())) {
+                if (areasAtIntersection(r1, r2, objectPoint)) {
 
-                    Pose2d found = new Pose2d(intersection.get(), new Rotation2d());
+                    Pose2d found = new Pose2d(objectPoint, new Rotation2d());
                     confirmedPieces.add(found);
                     latestEstimate = found;
                     toRemove.add(s1);
@@ -162,5 +167,42 @@ public class GamePieceFinder {
             return Optional.empty();
 
         return Optional.of(p);
+    }
+
+    //TODO: Wait what if the bot has moved its center between samples? Is that gonna be a problem
+    private Translation2d getPoseThroughParallax(Ray2d r1, Ray2d r2) {
+        Angle deltaYaw = Degrees.of(r2.robotPose().getRotation().minus(r1.robotPose().getRotation()).getDegrees());
+
+        Translation2d firstCameraPos = ROBOT_TO_FRONT_RIGHT_CAMERA_TRANSLATION.toTranslation2d();
+        //TODO: Need to check if this rotates the right way - should be to the left
+        Translation2d secondCameraPos = firstCameraPos.rotateAround(Translation2d.kZero, Rotation2d.fromDegrees(deltaYaw.in(Degrees)));
+
+        Translation2d vecBtwnCameraPos = firstCameraPos.minus(secondCameraPos);
+        
+        Angle cameraRot = ROBOT_TO_FRONT_RIGHT_CAMERA_ROTATION.getMeasureZ();
+        Angle angleOffset = Radians.of(Math.atan2(firstCameraPos.getY(), firstCameraPos.getX()));
+        Angle firstYaw = r1.measuredAngle;
+        Angle secondYaw = r2.measuredAngle;
+
+        //TODO: There's some redudant math here, need to come back and simplify/clean it up later
+        Angle alpha = Radians.of(Math.atan2(vecBtwnCameraPos.getY(), vecBtwnCameraPos.getX()));
+        Angle beta = Degrees.of(90 - alpha.in(Degrees));
+        Angle A = Degrees.of(cameraRot.in(Degrees) - firstYaw.in(Degrees) - alpha.in(Degrees));
+        Angle B = Degrees.of(360 - (cameraRot.in(Degrees) - secondYaw.in(Degrees) + angleOffset.in(Degrees) + ((180 - deltaYaw.in(Degrees))/2 - beta.in(Degrees))));
+        Angle C = Degrees.of(180 - A.in(Degrees) - B.in(Degrees));
+
+        //TODO: Need to make sure coordinate system matches (im assuming right is positive and up is positive)
+        Distance b = Meters.of((vecBtwnCameraPos.getDistance(Translation2d.kZero)/Math.sin(C.in(Radians)))*Math.sin(A.in(Radians)));
+        Translation2d robotToObject = new Translation2d(
+            -b.in(Meters)*Math.cos(A.in(Radians) + alpha.in(Radians)) + firstCameraPos.getMeasureX().in(Meters),
+            b.in(Meters)*Math.sin(A.in(Radians) + alpha.in(Radians)) + firstCameraPos.getMeasureY().in(Meters)
+        );
+        
+        //I did the above calculations assuming the robot was facing straight forward, so now I need to rotate the point to match the rotation of the robot
+        //I could change it to work for any initial direction of the bot in my calculations but whatever
+        //TODO: I assume it's gonna rotate in the right direction?
+        robotToObject = robotToObject.rotateAround(Translation2d.kZero, r1.robotPose.getRotation());
+
+        return r1.robotPose.getTranslation().plus(robotToObject);
     }
 }

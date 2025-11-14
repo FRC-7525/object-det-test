@@ -9,6 +9,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.photonvision.targeting.PhotonTrackedTarget;
 
 import edu.wpi.first.math.geometry.*;
+import edu.wpi.first.math.util.Units;
 import edu.wpi.first.units.measure.Angle;
 import edu.wpi.first.units.measure.Distance;
 import edu.wpi.first.units.measure.Time;
@@ -27,6 +28,8 @@ public class GamePieceFinder {
     private final double AREA_DISTANCE_TOLERANCE = 0.3; // 30% 
 
     private final Translation2d CAMERA_OFFSET = new Translation2d(0.0, 0.0); 
+
+    private final Rotation2d CAMERA_ROTATION_OFFSET = new Rotation2d(Units.degreesToRadians(27.8));
 
     private Pose2d latestEstimate;
 
@@ -47,9 +50,8 @@ public class GamePieceFinder {
             double yawDeg = visionSample.getYaw();
             double distance = estimateDistanceFromArea(visionSample.getArea());
 
-            Translation2d cameraPos = robotPose.transformBy(new Transform2d(CAMERA_OFFSET, new Rotation2d())).getTranslation();
+            Translation2d cameraPos = robotPose.transformBy(new Transform2d(CAMERA_OFFSET, CAMERA_ROTATION_OFFSET)).getTranslation();
 
-            // Wait lwky is the getYaw function in deg
             double globalAngle = robotPose.getRotation().getRadians() + Math.toRadians(yawDeg);
             Translation2d dir = new Translation2d(Math.cos(globalAngle), Math.sin(globalAngle));
 
@@ -85,6 +87,11 @@ public class GamePieceFinder {
     public void periodic() {
         cleanupOldSamples();
         if (parallaxSamples.size() > 1) updateEstimates();
+    }
+
+    public void clearPoseEstimates() {
+        confirmedPieces.clear();
+        latestEstimate = null;
     }
 
 

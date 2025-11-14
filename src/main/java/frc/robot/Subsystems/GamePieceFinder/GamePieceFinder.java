@@ -113,11 +113,11 @@ public class GamePieceFinder {
                 Ray2d r1 = s1.toRay();
                 Ray2d r2 = s2.toRay();
 
-                Translation2d objectPoint = getPoseThroughParallax(r1, r2);
+                Optional<Translation2d> objectPoint = intersectRays(r1, r2);
                 // Chat will it continue if the first condition isnt met and then leave my thingy that might get a null pointer alone
-                if (areasAtIntersection(r1, r2, objectPoint)) {
+                if (!objectPoint.isEmpty() && areasAtIntersection(r1, r2, objectPoint.get())) {
 
-                    Pose2d found = new Pose2d(objectPoint, new Rotation2d());
+                    Pose2d found = new Pose2d(objectPoint.get(), new Rotation2d());
                     confirmedPieces.add(found);
                     latestEstimate = found;
                     toRemove.add(s1);

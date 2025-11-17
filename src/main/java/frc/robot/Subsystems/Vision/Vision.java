@@ -7,6 +7,7 @@ import org.photonvision.PhotonCamera;
 
 import edu.wpi.first.units.measure.Angle;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
+import frc.robot.Subsystems.GamePieceFinder.GamePieceFinder;
 
 public class Vision extends SubsystemBase {
     
@@ -37,7 +38,7 @@ public class Vision extends SubsystemBase {
 
         for (var result : results) {
             var target = result.getBestTarget();
-
+            GamePieceFinder.getInstance().addVisionSample(target);
             if (target != null) {
                 targetYaw = Degrees.of(target.getYaw());
                 System.out.println(targetYaw.in(Degrees));

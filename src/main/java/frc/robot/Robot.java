@@ -7,6 +7,7 @@ package frc.robot;
 import edu.wpi.first.wpilibj.TimedRobot;
 import edu.wpi.first.wpilibj2.command.CommandScheduler;
 import frc.robot.Subsystems.Drive.Drive;
+import frc.robot.Subsystems.GamePieceFinder.GamePieceFinder;
 import frc.robot.Subsystems.Vision.Vision;
 
 /**
@@ -28,6 +29,7 @@ public class Robot extends TimedRobot {
 		CommandScheduler.getInstance().run();
     Vision.getInstance().periodic();
     Drive.getInstance().periodic();
+    GamePieceFinder.getInstance().periodic();
   }
 
   @Override

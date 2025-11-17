@@ -5,6 +5,7 @@ import static frc.robot.Subsystems.Vision.VisionConstants.*;
 
 import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
+import org.littletonrobotics.junction.Logger;
 
 import org.photonvision.targeting.PhotonTrackedTarget;
 
@@ -13,6 +14,7 @@ import edu.wpi.first.math.util.Units;
 import edu.wpi.first.units.measure.Angle;
 import edu.wpi.first.units.measure.Distance;
 import edu.wpi.first.units.measure.Time;
+import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import frc.robot.Subsystems.Drive.Drive;
 
 public class GamePieceFinder {
@@ -87,6 +89,8 @@ public class GamePieceFinder {
     public void periodic() {
         cleanupOldSamples();
         if (parallaxSamples.size() > 1) updateEstimates();
+        Logger.recordOutput("GamePieceFinder/ConfirmedPieces", confirmedPieces.size());
+        Logger.recordOutput("GamePieceFinder/Pose", getLatestGamepieceEstimate());
     }
 
     public void clearPoseEstimates() {

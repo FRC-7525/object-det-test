@@ -71,6 +71,10 @@ public class GamePieceFinder {
     private GamePieceFinder() {}
 
     public void addVisionSample(PhotonTrackedTarget sample) {
+        // Order of if statements matters here
+        if (parallaxSamples.size() > 0 && Math.abs(sample.getYaw() - parallaxSamples.element().visionSample.getYaw())< MIN_YAW_DIFFERENCE_DEG) {
+            return; 
+        }
         parallaxSamples.add(new GamePieceParallaxSample(Drive.getInstance().getPose(), Milliseconds.of(System.currentTimeMillis()), sample));
 
     }

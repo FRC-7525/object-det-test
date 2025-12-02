@@ -284,8 +284,10 @@ public class BallDetectionTest extends IterativeRobotBase {
         
         if (testsFailed == 0) {
             System.out.println("ALL TESTS PASSED - Parallax math is correct!");
+            System.exit(0);
         } else {
             System.out.println("SOME TESTS FAILED - Check ray intersection logic");
+            System.exit(1);
         }
     }
     

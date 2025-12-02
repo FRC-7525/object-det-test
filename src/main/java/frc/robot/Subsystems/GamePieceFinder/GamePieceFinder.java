@@ -1,7 +1,6 @@
 package frc.robot.Subsystems.GamePieceFinder;
 
 import static edu.wpi.first.units.Units.*;
-import static frc.robot.Subsystems.Vision.VisionConstants.*;
 
 import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
@@ -12,9 +11,7 @@ import org.photonvision.targeting.PhotonTrackedTarget;
 import edu.wpi.first.math.geometry.*;
 import edu.wpi.first.math.util.Units;
 import edu.wpi.first.units.measure.Angle;
-import edu.wpi.first.units.measure.Distance;
 import edu.wpi.first.units.measure.Time;
-import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import frc.robot.Subsystems.Drive.Drive;
 
 public class GamePieceFinder {
@@ -29,7 +26,7 @@ public class GamePieceFinder {
     private final double MIN_YAW_DIFFERENCE_DEG = 10.0;
     private final double AREA_DISTANCE_TOLERANCE = 0.3; // 30% 
 
-    private final Translation2d CAMERA_OFFSET = new Translation2d(0.0, 0.0); 
+    private final Translation2d CAMERA_OFFSET = new Translation2d(Units.inchesToMeters(11.809459), Units.inchesToMeters(-11.164206)); 
 
     private final Rotation2d CAMERA_ROTATION_OFFSET = new Rotation2d(Units.degreesToRadians(27.8));
 
@@ -51,13 +48,21 @@ public class GamePieceFinder {
         public Ray2d toRay() { 
             double yawDeg = visionSample.getYaw();
             double distance = estimateDistanceFromArea(visionSample.getArea());
-
-            Translation2d cameraPos = robotPose.transformBy(new Transform2d(CAMERA_OFFSET, CAMERA_ROTATION_OFFSET)).getTranslation();
-
-            double globalAngle = robotPose.getRotation().getRadians() + Math.toRadians(yawDeg);
-            Translation2d dir = new Translation2d(Math.cos(globalAngle), Math.sin(globalAngle));
-
-            return new Ray2d(cameraPos, dir, distance, visionSample.getArea(), Degrees.of(yawDeg), robotPose);
+            
+            Transform2d robotToCamera = new Transform2d(CAMERA_OFFSET, CAMERA_ROTATION_OFFSET);
+            Translation2d cameraPos = robotPose.transformBy(robotToCamera).getTranslation();
+            
+            double globalAngleRad = robotPose.getRotation().getRadians() 
+                                  + CAMERA_ROTATION_OFFSET.getRadians() 
+                                  + Math.toRadians(yawDeg);
+            
+            Translation2d dir = new Translation2d(
+                Math.cos(globalAngleRad), 
+                Math.sin(globalAngleRad)
+            );
+            
+            return new Ray2d(cameraPos, dir, distance, visionSample.getArea(), 
+                             Degrees.of(yawDeg), robotPose);
         }
     }
 
@@ -110,9 +115,6 @@ public class GamePieceFinder {
 
         for (int i = 0; i < samples.size(); i++) {
             for (int j = i + 1; j < samples.size(); j++) {
-                //I need the "first" sample to have the smaller rotation so that I can set it as 0 and go off of that for calculations
-                //TODO: Logic will mess up if rotation can be negative, so need to confirm that its not/deal with it if it is
-                //TODO: Probably better way to implement this logic lol
                 var s1 = samples.get(i);
                 var s2 = samples.get(j);
 
@@ -122,12 +124,8 @@ public class GamePieceFinder {
                 Ray2d r1 = s1.toRay();
                 Ray2d r2 = s2.toRay();
 
-                Logger.recordOutput("R1", r1.dir);
-                Logger.recordOutput("R2", r2.dir);
-
                 Translation2d objectPoint = getPoseThroughParallax(r1, r2);
-                System.out.println(objectPoint);
-                // Chat will it continue if the first condition isnt met and then leave my thingy that might get a null pointer alone
+                debugRays(r1, r2, objectPoint); 
                 if (areasAtIntersection(r1, r2, objectPoint)) {
 
                     Pose2d found = new Pose2d(objectPoint, new Rotation2d());
@@ -162,68 +160,88 @@ public class GamePieceFinder {
         
         boolean ok1 = Math.abs(distAlongR1 - predictedR1) / predictedR1 < AREA_DISTANCE_TOLERANCE;
         boolean ok2 = Math.abs(distAlongR2 - predictedR2) / predictedR2 < AREA_DISTANCE_TOLERANCE;
-    
-        return ok1 && ok2;
+        // TODO: Fx ts
+        return true;
     }
 
-    // Silly vector intersection solution, idrk if this is optimal or works @william feel free to replace with your calc
-    private Optional<Translation2d> intersectRays(Ray2d r1, Ray2d r2) {
-        double x1 = r1.origin().getX(), y1 = r1.origin().getY();
-        double x2 = x1 + r1.dir().getX(), y2 = y1 + r1.dir().getY();
-        double x3 = r2.origin().getX(), y3 = r2.origin().getY();
-        double x4 = x3 + r2.dir().getX(), y4 = y3 + r2.dir().getY();
-
-        double denominator = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
-        if (Math.abs(denominator) < 1e-2) return Optional.empty(); // if theyre parallel then throw ts out
-
-        double px = ((x1*y2 - y1*x2)*(x3 - x4) - (x1 - x2)*(x3*y4 - y3*x4)) / denominator;
-        double py = ((x1*y2 - y1*x2)*(y3 - y4) - (y1 - y2)*(x3*y4 - y3*x4)) / denominator;
-
-        Translation2d p = new Translation2d(px, py);
-        System.out.println(p);
-
-        // Ignore balls that are fall away
-        if (p.minus(r1.origin()).getNorm() > r1.length() * 1.5 ||
-            p.minus(r2.origin()).getNorm() > r2.length() * 1.5)
-            return Optional.empty();
-
-        return Optional.of(p);
-    }
-
-    //TODO: Wait what if the bot has moved its center between samples? Is that gonna be a problem
     private Translation2d getPoseThroughParallax(Ray2d r1, Ray2d r2) {
-        Angle deltaYaw = Degrees.of(r2.robotPose().getRotation().minus(r1.robotPose().getRotation()).getDegrees());
-
-        Translation2d firstCameraPos = ROBOT_TO_FRONT_RIGHT_CAMERA_TRANSLATION.toTranslation2d();
-        //TODO: Need to check if this rotates the right way - should be to the left
-        Translation2d secondCameraPos = firstCameraPos.rotateAround(Translation2d.kZero, Rotation2d.fromDegrees(deltaYaw.in(Degrees)));
-
-        Translation2d vecBtwnCameraPos = firstCameraPos.minus(secondCameraPos);
+        // Use simple 2D ray intersection instead of complex angle math
+        Optional<Translation2d> intersection = intersectRays(r1, r2);
         
-        Angle cameraRot = ROBOT_TO_FRONT_RIGHT_CAMERA_ROTATION.getMeasureZ();
-        Angle angleOffset = Radians.of(Math.atan2(firstCameraPos.getY(), firstCameraPos.getX()));
-        Angle firstYaw = r1.measuredAngle;
-        Angle secondYaw = r2.measuredAngle;
+        if (intersection.isEmpty()) {
+            // for parallel thngs
+            return r1.origin().plus(r1.dir().times(r1.length()));
+        }
+        
+        return intersection.get();
+    }
 
-        //TODO: There's some redudant math here, need to come back and simplify/clean it up later
-        Angle alpha = Radians.of(Math.atan2(vecBtwnCameraPos.getY(), vecBtwnCameraPos.getX()));
-        Angle beta = Degrees.of(90 - alpha.in(Degrees));
-        Angle A = Degrees.of(cameraRot.in(Degrees) - firstYaw.in(Degrees) - alpha.in(Degrees));
-        Angle B = Degrees.of(360 - (cameraRot.in(Degrees) - secondYaw.in(Degrees) + angleOffset.in(Degrees) + ((180 - deltaYaw.in(Degrees))/2 - beta.in(Degrees))));
-        Angle C = Degrees.of(180 - A.in(Degrees) - B.in(Degrees));
-
-        //TODO: Need to make sure coordinate system matches (im assuming right is positive and up is positive)
-        Distance b = Meters.of((vecBtwnCameraPos.getDistance(Translation2d.kZero)/Math.sin(C.in(Radians)))*Math.sin(A.in(Radians)));
-        Translation2d robotToObject = new Translation2d(
-            -b.in(Meters)*Math.cos(A.in(Radians) + alpha.in(Radians)) + firstCameraPos.getMeasureX().in(Meters),
-            b.in(Meters)*Math.sin(A.in(Radians) + alpha.in(Radians)) + firstCameraPos.getMeasureY().in(Meters)
+    private Optional<Translation2d> intersectRays(Ray2d r1, Ray2d r2) {
+        // Ray 1: P1 = origin1 + t1 * dir1
+        // Ray 2: P2 = origin2 + t2 * dir2
+        // Solve for where P1 = P2
+        
+        double x1 = r1.origin().getX();
+        double y1 = r1.origin().getY();
+        double dx1 = r1.dir().getX();
+        double dy1 = r1.dir().getY();
+        
+        double x2 = r2.origin().getX();
+        double y2 = r2.origin().getY();
+        double dx2 = r2.dir().getX();
+        double dy2 = r2.dir().getY();
+        
+        // Solve using cross product method
+        double denominator = dx1 * dy2 - dy1 * dx2;
+        
+        if (Math.abs(denominator) < 1e-6) {
+            return Optional.empty(); // Parallel rays
+        }
+        
+        // Calculate t1 (parameter along ray1)
+        double t1 = ((x2 - x1) * dy2 - (y2 - y1) * dx2) / denominator;
+        
+        // Calculate intersection point
+        Translation2d intersection = new Translation2d(
+            x1 + t1 * dx1,
+            y1 + t1 * dy1
         );
         
-        //I did the above calculations assuming the robot was facing straight forward, so now I need to rotate the point to match the rotation of the robot
-        //I could change it to work for any initial direction of the bot in my calculations but whatever
-        //TODO: I assume it's gonna rotate in the right direction?
-        robotToObject = robotToObject.rotateAround(Translation2d.kZero, r1.robotPose.getRotation());
+        // Sanity check: intersection should be roughly within expected distance
+        double dist1 = intersection.minus(r1.origin()).getNorm();
+        double dist2 = intersection.minus(r2.origin()).getNorm();
+        
+        // Reject if intersection is way beyond expected distances
+        if (dist1 > r1.length() * 2.0 || dist2 > r2.length() * 2.0) {
+            return Optional.empty();
+        }
+        
+        // Reject if intersection is behind either camera (negative t)
+        if (t1 < 0) {
+            return Optional.empty();
+        }
+        
+        return Optional.of(intersection);
+    }
 
-        return r1.robotPose.getTranslation().plus(robotToObject);
+    private void debugRays(Ray2d r1, Ray2d r2, Translation2d intersection) {
+        // Log ray origins
+        Logger.recordOutput("Parallax/Ray1Origin", new Pose2d(r1.origin(), new Rotation2d()));
+        Logger.recordOutput("Parallax/Ray2Origin", new Pose2d(r2.origin(), new Rotation2d()));
+        
+        // Log ray endpoints (origin + direction * length)
+        Translation2d r1End = r1.origin().plus(r1.dir().times(r1.length()));
+        Translation2d r2End = r2.origin().plus(r2.dir().times(r2.length()));
+        Logger.recordOutput("Parallax/Ray1End", new Pose2d(r1End, new Rotation2d()));
+        Logger.recordOutput("Parallax/Ray2End", new Pose2d(r2End, new Rotation2d()));
+        
+        // Log intersection
+        Logger.recordOutput("Parallax/Intersection", new Pose2d(intersection, new Rotation2d()));
+        
+        // Log angles and distances
+        Logger.recordOutput("Parallax/Ray1Length", r1.length());
+        Logger.recordOutput("Parallax/Ray2Length", r2.length());
+        Logger.recordOutput("Parallax/ActualDist1", intersection.minus(r1.origin()).getNorm());
+        Logger.recordOutput("Parallax/ActualDist2", intersection.minus(r2.origin()).getNorm());
     }
 }

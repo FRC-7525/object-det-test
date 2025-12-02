@@ -75,6 +75,7 @@ public class BallDetectionTest extends IterativeRobotBase {
     
         // Area random bc uh i like dont have a formula for area that works and wouldnt sim that so yeah
         finder.setTestRobotPose(pose1);
+        System.out.println("  Some doohickey with adding a pose .");
         finder.addVisionSample(createTarget(yaw1, 5.0));
         System.out.println("  Added first vision sample.");
 

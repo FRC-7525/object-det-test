@@ -164,8 +164,8 @@ public class BallDetectionTest extends IterativeRobotBase {
         // Robot moves slightly - should be right at the MIN_YAW_DIFFERENCE threshold
         Pose2d pose1 = new Pose2d(0.0, 0.0, Rotation2d.fromDegrees(0));
         double yaw1 = calculateYaw(pose1, ballPos);
-        
-        Pose2d pose2 = new Pose2d(0.0, 1.0, Rotation2d.fromDegrees(0));
+         
+        Pose2d pose2 = new Pose2d(0.0, 1.2, Rotation2d.fromDegrees(0));
         double yaw2 = calculateYaw(pose2, ballPos);
         
         System.out.printf("  Sample 1: Yaw = %.1f°\n", yaw1);

@@ -36,8 +36,9 @@ public class Robot extends LoggedRobot {
 		CommandScheduler.getInstance().run();
     Drive.getInstance().periodic();
     GamePieceFinder.getInstance().periodic();
-    if (GlobalConstants.ROBOT_MODE != GlobalConstants.RobotMode.SIM) {
+    if (Robot.isReal()) {
       Vision.getInstance().periodic();
+      System.out.println("lallala");
     }
   }
 

@@ -38,11 +38,10 @@ public class Vision extends SubsystemBase {
 
         for (var result : results) {
             var target = result.getBestTarget();
-            GamePieceFinder.getInstance().addVisionSample(target);
             if (target != null) {
+                GamePieceFinder.getInstance().addVisionSample(target);
                 targetYaw = Degrees.of(target.getYaw());
-                System.out.println(targetYaw.in(Degrees));
+            }
         }
-    }
     }
 }

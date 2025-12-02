@@ -21,7 +21,7 @@ public class GamePieceFinder {
 
     private static final AtomicReference<GamePieceFinder> instance = new AtomicReference<>();
 
-    private final Queue<GamePieceParallaxSample> parallaxSamples = new LinkedList<>();
+    private final Deque<GamePieceParallaxSample> parallaxSamples = new LinkedList<>();
     private final List<Pose2d> confirmedPieces = new ArrayList<>();
 
     private final Time SAMPLE_EXPIRATION = Seconds.of(10.0); 
@@ -72,7 +72,7 @@ public class GamePieceFinder {
 
     public void addVisionSample(PhotonTrackedTarget sample) {
         // Order of if statements matters here
-        if (parallaxSamples.size() > 0 && Math.abs(sample.getYaw() - parallaxSamples.element().visionSample.getYaw())< MIN_YAW_DIFFERENCE_DEG) {
+        if (parallaxSamples.size() > 0 && Math.abs(sample.getYaw() - parallaxSamples.peekLast().visionSample.getYaw())< MIN_YAW_DIFFERENCE_DEG) {
             return; 
         }
         parallaxSamples.add(new GamePieceParallaxSample(Drive.getInstance().getPose(), Milliseconds.of(System.currentTimeMillis()), sample));
@@ -95,6 +95,7 @@ public class GamePieceFinder {
         if (parallaxSamples.size() > 1) updateEstimates();
         Logger.recordOutput("GamePieceFinder/ConfirmedPieces", confirmedPieces.size());
         Logger.recordOutput("GamePieceFinder/Pose", getLatestGamepieceEstimate());
+        Logger.recordOutput("GamePiceceFinder/VisionSamples", parallaxSamples.size());
     }
 
     public void clearPoseEstimates() {
@@ -112,8 +113,8 @@ public class GamePieceFinder {
                 //I need the "first" sample to have the smaller rotation so that I can set it as 0 and go off of that for calculations
                 //TODO: Logic will mess up if rotation can be negative, so need to confirm that its not/deal with it if it is
                 //TODO: Probably better way to implement this logic lol
-                var s1 = samples.get(i).robotPose.getRotation().getDegrees() < samples.get(j).robotPose.getRotation().getDegrees() ? samples.get(i) : samples.get(j);
-                var s2 = samples.get(i).robotPose.getRotation().getDegrees() > samples.get(j).robotPose.getRotation().getDegrees() ? samples.get(i) : samples.get(j);
+                var s1 = samples.get(i);
+                var s2 = samples.get(j);
 
                 double yawDiff = Math.abs(s2.visionSample.getYaw() - s1.visionSample.getYaw());
                 if (yawDiff < MIN_YAW_DIFFERENCE_DEG) continue;
@@ -121,11 +122,15 @@ public class GamePieceFinder {
                 Ray2d r1 = s1.toRay();
                 Ray2d r2 = s2.toRay();
 
-                Optional<Translation2d> objectPoint = intersectRays(r1, r2);
-                // Chat will it continue if the first condition isnt met and then leave my thingy that might get a null pointer alone
-                if (!objectPoint.isEmpty() && areasAtIntersection(r1, r2, objectPoint.get())) {
+                Logger.recordOutput("R1", r1.dir);
+                Logger.recordOutput("R2", r2.dir);
 
-                    Pose2d found = new Pose2d(objectPoint.get(), new Rotation2d());
+                Translation2d objectPoint = getPoseThroughParallax(r1, r2);
+                System.out.println(objectPoint);
+                // Chat will it continue if the first condition isnt met and then leave my thingy that might get a null pointer alone
+                if (areasAtIntersection(r1, r2, objectPoint)) {
+
+                    Pose2d found = new Pose2d(objectPoint, new Rotation2d());
                     confirmedPieces.add(found);
                     latestEstimate = found;
                     toRemove.add(s1);
@@ -175,6 +180,7 @@ public class GamePieceFinder {
         double py = ((x1*y2 - y1*x2)*(y3 - y4) - (y1 - y2)*(x3*y4 - y3*x4)) / denominator;
 
         Translation2d p = new Translation2d(px, py);
+        System.out.println(p);
 
         // Ignore balls that are fall away
         if (p.minus(r1.origin()).getNorm() > r1.length() * 1.5 ||

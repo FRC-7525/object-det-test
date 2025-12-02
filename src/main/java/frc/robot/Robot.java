@@ -34,9 +34,11 @@ public class Robot extends LoggedRobot {
   @Override
   public void robotPeriodic() {
 		CommandScheduler.getInstance().run();
-    Vision.getInstance().periodic();
     Drive.getInstance().periodic();
     GamePieceFinder.getInstance().periodic();
+    if (GlobalConstants.ROBOT_MODE != GlobalConstants.RobotMode.SIM) {
+      Vision.getInstance().periodic();
+    }
   }
 
   @Override

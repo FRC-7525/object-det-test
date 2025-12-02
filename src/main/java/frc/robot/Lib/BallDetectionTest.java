@@ -15,6 +15,7 @@ public class BallDetectionTest extends IterativeRobotBase {
     private int testsPassed = 0;
     private int testsFailed = 0;
     private long startTime;
+    private boolean win;
     
     public BallDetectionTest() {
         super(0.02);
@@ -32,7 +33,9 @@ public class BallDetectionTest extends IterativeRobotBase {
         testParallaxGeometry();
         
         printResults();
-        System.exit(testsFailed > 0 ? 1 : 0);
+        try { Thread.sleep(50); } catch (InterruptedException e) {}
+
+        System.exit(win ? 0 : 1);
     }
     
     private void testParallaxGeometry() {
@@ -284,10 +287,10 @@ public class BallDetectionTest extends IterativeRobotBase {
         
         if (testsFailed == 0) {
             System.out.println("ALL TESTS PASSED - Parallax math is correct!");
-            System.exit(0);
+            win = true;
         } else {
             System.out.println("SOME TESTS FAILED - Check ray intersection logic");
-            System.exit(1);
+            win = false;
         }
     }
     

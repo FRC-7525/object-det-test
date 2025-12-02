@@ -20,12 +20,9 @@ jobs:
       - name: Grant execute permission
         run: chmod +x gradlew
         
-      - name: Build robot code
-        run: ./gradlew build
-        
       - name: Run Ball Detection Tests
         env:                
-            CI_NAME: "BallDetection"
+            CI_NAME: "Ball"
         run: ./gradlew simulateJava | tee ball-detection.log
 
       - name: Check Test Results

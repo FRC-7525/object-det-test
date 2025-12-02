@@ -1,5 +1,3 @@
-// org/team7525/CI/BallDetectionTest.java
-
 package frc.robot.Lib;
 
 import edu.wpi.first.hal.HAL;
@@ -17,8 +15,6 @@ public class BallDetectionTest extends IterativeRobotBase {
     private int testsPassed = 0;
     private int testsFailed = 0;
     private long startTime;
-
-    // TODO: No magic numbers
     
     public BallDetectionTest() {
         super(0.02);
@@ -27,7 +23,6 @@ public class BallDetectionTest extends IterativeRobotBase {
     
     @Override
     public void startCompetition() {
-        try { Thread.sleep(200); } catch (InterruptedException e) {}
         System.out.println("********** Parallax Triangulation Tests **********\n");
         
         finder = GamePieceFinder.getInstance();
@@ -75,19 +70,16 @@ public class BallDetectionTest extends IterativeRobotBase {
             pose1.getX(), pose1.getY(), yaw1);
         System.out.printf("  Sample 2: Robot at (%.1f, %.1f), Yaw = %.1f°\n", 
             pose2.getX(), pose2.getY(), yaw2);
-    
-        // Area random bc uh i like dont have a formula for area that works and wouldnt sim that so yeah
+        
+        // Add samples with dummy area (since we're not testing distance estimation)
         finder.setTestRobotPose(pose1);
-        System.out.println("  Some doohickey with adding a pose .");
         finder.addVisionSample(createTarget(yaw1, 5.0));
-        System.out.println("  Added first vision sample.");
-
+        
         try { Thread.sleep(50); } catch (InterruptedException e) {}
         
         finder.setTestRobotPose(pose2);
         finder.addVisionSample(createTarget(yaw2, 5.0));
-        System.out.println("  Added two vision samples.");
-
+        
         finder.periodic();
         
         evaluateResult(ballPos, "Test 1");
@@ -193,17 +185,35 @@ public class BallDetectionTest extends IterativeRobotBase {
         evaluateResult(ballPos, "Test 4");
     }
     
-    // Calculate yaw angle from robot to ball (relative to robot frame)
+    // Calculate yaw angle from robot to ball (relative to camera frame)
+    // MUST match the camera offset and rotation in GamePieceFinder!
     private double calculateYaw(Pose2d robotPose, Translation2d ballPos) {
-        // Vector from robot to ball in global frame
-        Translation2d robotToBall = ballPos.minus(robotPose.getTranslation());
+        // Camera offset (translation only - pitch doesn't affect 2D intersection)
+        Translation2d CAMERA_OFFSET = new Translation2d(
+            edu.wpi.first.math.util.Units.inchesToMeters(11.809459), 
+            edu.wpi.first.math.util.Units.inchesToMeters(-11.164206)
+        );
+        // Camera yaw offset (27.8° is YAW, not pitch!)
+        Rotation2d CAMERA_YAW_OFFSET = new Rotation2d(
+            edu.wpi.first.math.util.Units.degreesToRadians(27.8)
+        );
         
-        // Global angle to ball
-        double globalAngle = Math.atan2(robotToBall.getY(), robotToBall.getX());
+        // Step 1: Get camera position in global frame
+        // Rotate camera offset by robot's rotation, then add to robot position
+        Translation2d cameraOffsetGlobal = CAMERA_OFFSET.rotateBy(robotPose.getRotation());
+        Translation2d cameraPos = robotPose.getTranslation().plus(cameraOffsetGlobal);
         
-        // Convert to robot-relative angle
-        double robotAngle = robotPose.getRotation().getRadians();
-        double yawRad = globalAngle - robotAngle;
+        // Step 2: Calculate camera's global heading (robot rotation + camera yaw offset)
+        Rotation2d cameraGlobalHeading = robotPose.getRotation().plus(CAMERA_YAW_OFFSET);
+        
+        // Step 3: Vector from camera to ball
+        Translation2d cameraToBall = ballPos.minus(cameraPos);
+        
+        // Step 4: Global angle to ball
+        double globalAngleToBall = Math.atan2(cameraToBall.getY(), cameraToBall.getX());
+        
+        // Step 5: Yaw = global angle to ball - camera's global heading
+        double yawRad = globalAngleToBall - cameraGlobalHeading.getRadians();
         
         // Convert to degrees and normalize to [-180, 180]
         double yawDeg = Math.toDegrees(yawRad);
@@ -235,7 +245,7 @@ public class BallDetectionTest extends IterativeRobotBase {
         Pose2d estimate = finder.getLatestGamepieceEstimate();
         
         if (estimate == null) {
-            System.out.printf(" %s FAILED: No estimate generated\n", testName);
+            System.out.printf("%s FAILED: No estimate generated\n", testName);
             System.out.println("(Samples may not have passed MIN_YAW_DIFFERENCE threshold)\n");
             testsFailed++;
             return;

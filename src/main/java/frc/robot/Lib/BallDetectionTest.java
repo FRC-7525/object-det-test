@@ -24,6 +24,7 @@ public class BallDetectionTest extends IterativeRobotBase {
     
     @Override
     public void startCompetition() {
+        try { Thread.sleep(200); } catch (InterruptedException e) {}
         System.out.println("********** Parallax Triangulation Tests **********\n");
         
         finder = GamePieceFinder.getInstance();
@@ -75,12 +76,14 @@ public class BallDetectionTest extends IterativeRobotBase {
         // Area random bc uh i like dont have a formula for area that works and wouldnt sim that so yeah
         finder.setTestRobotPose(pose1);
         finder.addVisionSample(createTarget(yaw1, 5.0));
-        
+        System.out.println("  Added first vision sample.");
+
         try { Thread.sleep(50); } catch (InterruptedException e) {}
         
         finder.setTestRobotPose(pose2);
         finder.addVisionSample(createTarget(yaw2, 5.0));
-        
+        System.out.println("  Added two vision samples.");
+
         finder.periodic();
         
         evaluateResult(ballPos, "Test 1");

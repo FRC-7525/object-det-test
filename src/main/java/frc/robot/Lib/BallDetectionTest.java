@@ -6,6 +6,9 @@ import edu.wpi.first.hal.HAL;
 import edu.wpi.first.math.geometry.*;
 import edu.wpi.first.wpilibj.IterativeRobotBase;
 import frc.robot.Subsystems.GamePieceFinder.GamePieceFinder;
+
+import java.util.ArrayList;
+
 import org.photonvision.targeting.PhotonTrackedTarget;
 
 public class BallDetectionTest extends IterativeRobotBase {
@@ -220,11 +223,11 @@ public class BallDetectionTest extends IterativeRobotBase {
             -1,     // fiducialId
             -1,     // i dont even know what this is
             1, 
-            null,   // bestCameraToTarget
-            null,   // altCameraToTarget
+            new Transform3d(),   // bestCameraToTarget
+            new Transform3d(),   // altCameraToTarget
             0,      // poseAmbiguity
-            null,   // minAreaRectCorners
-            null    // detectedCorners
+            new ArrayList<>(),   // minAreaRectCorners
+            new ArrayList<>()    // detectedCorners
         );
     }
     

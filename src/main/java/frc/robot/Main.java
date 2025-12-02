@@ -5,6 +5,8 @@
 package frc.robot;
 
 import edu.wpi.first.wpilibj.RobotBase;
+import frc.robot.Lib.BallDetectionTest;
+
 import org.team7525.CI.CrashCheck;
 
 public final class Main {
@@ -12,6 +14,6 @@ public final class Main {
 	private Main() {}
 
 	public static void main(String... args) {
-		RobotBase.startRobot("Crash".equals(System.getenv("CI_NAME")) ? () -> new CrashCheck(new Robot()) : Robot::new);
+		RobotBase.startRobot("Ball".equals(System.getenv("CI_NAME")) ? () -> new BallDetectionTest() : Robot::new);
 	}
 }

@@ -20,7 +20,7 @@ public class GamePieceFinder {
 
     private final Deque<GamePieceParallaxSample> parallaxSamples = new LinkedList<>();
     private final List<Pose2d> confirmedPieces = new ArrayList<>();
-
+    private Pose2d testRobotPose = null;
     private final Time SAMPLE_EXPIRATION = Seconds.of(10.0); 
 
     private final double MIN_YAW_DIFFERENCE_DEG = 10.0;
@@ -32,7 +32,7 @@ public class GamePieceFinder {
 
     private Pose2d latestEstimate;
 
-    private record Ray2d(Translation2d origin, Translation2d dir, double length, double area, Angle measuredAngle, Pose2d robotPose) {}
+    public record Ray2d(Translation2d origin, Translation2d dir, double length, double area, Angle measuredAngle, Pose2d robotPose) {}
 
     private class GamePieceParallaxSample {
         public final Pose2d robotPose;
@@ -75,12 +75,22 @@ public class GamePieceFinder {
 
     private GamePieceFinder() {}
 
+    // TODO: Check env name and throw an exception if youre not in CI mode
+    public void setTestRobotPose(Pose2d pose) {
+        this.testRobotPose = pose;
+    }
+
     public void addVisionSample(PhotonTrackedTarget sample) {
         // Order of if statements matters here
         if (parallaxSamples.size() > 0 && Math.abs(sample.getYaw() - parallaxSamples.peekLast().visionSample.getYaw())< MIN_YAW_DIFFERENCE_DEG) {
             return; 
         }
-        parallaxSamples.add(new GamePieceParallaxSample(Drive.getInstance().getPose(), Milliseconds.of(System.currentTimeMillis()), sample));
+
+        Pose2d robotPose = (testRobotPose != null) 
+            ? testRobotPose 
+            : Drive.getInstance().getPose();
+
+        parallaxSamples.add(new GamePieceParallaxSample(robotPose, Milliseconds.of(System.currentTimeMillis()), sample));
 
     }
 
@@ -177,10 +187,6 @@ public class GamePieceFinder {
     }
 
     private Optional<Translation2d> intersectRays(Ray2d r1, Ray2d r2) {
-        // Ray 1: P1 = origin1 + t1 * dir1
-        // Ray 2: P2 = origin2 + t2 * dir2
-        // Solve for where P1 = P2
-        
         double x1 = r1.origin().getX();
         double y1 = r1.origin().getY();
         double dx1 = r1.dir().getX();
@@ -191,14 +197,13 @@ public class GamePieceFinder {
         double dx2 = r2.dir().getX();
         double dy2 = r2.dir().getY();
         
-        // Solve using cross product method
+        // Check if rays are parallel
         double denominator = dx1 * dy2 - dy1 * dx2;
-        
         if (Math.abs(denominator) < 1e-6) {
-            return Optional.empty(); // Parallel rays
+            return Optional.empty();
         }
         
-        // Calculate t1 (parameter along ray1)
+        // Calculate parameter t1 along ray1
         double t1 = ((x2 - x1) * dy2 - (y2 - y1) * dx2) / denominator;
         
         // Calculate intersection point
@@ -207,19 +212,32 @@ public class GamePieceFinder {
             y1 + t1 * dy1
         );
         
-        // Sanity check: intersection should be roughly within expected distance
-        double dist1 = intersection.minus(r1.origin()).getNorm();
-        double dist2 = intersection.minus(r2.origin()).getNorm();
+        // Basic sanity checks that don't depend on distance estimation:
         
-        // Reject if intersection is way beyond expected distances
-        if (dist1 > r1.length() * 2.0 || dist2 > r2.length() * 2.0) {
-            return Optional.empty();
-        }
-        
-        // Reject if intersection is behind either camera (negative t)
+        // 1. Intersection must be in front of both cameras (t > 0)
         if (t1 < 0) {
             return Optional.empty();
         }
+        
+        // 2. Calculate t2 to verify it's also positive
+        double t2 = ((x1 - x2) * dy1 - (y1 - y2) * dx1) / (-denominator);
+        if (t2 < 0) {
+            return Optional.empty();
+        }
+        
+        // 3. Reasonable distance check - intersection should be within ~10m
+        //    (prevents crazy far-away intersections from numerical issues)
+        double dist1 = intersection.minus(r1.origin()).getNorm();
+        double dist2 = intersection.minus(r2.origin()).getNorm();
+        
+        if (dist1 > 10.0 || dist2 > 10.0) {
+            return Optional.empty();
+        }
+        
+        // TODO: Once distance formula is calibrated, re-enable this check:
+        // if (dist1 > r1.length() * 2.0 || dist2 > r2.length() * 2.0) {
+        //     return Optional.empty();
+        // }
         
         return Optional.of(intersection);
     }

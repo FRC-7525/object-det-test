@@ -1,0 +1,57 @@
+name: Ball
+
+on: 
+  push:
+  pull_request:
+
+jobs:
+  BallDetection:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up JDK
+        uses: actions/setup-java@v1
+        with:
+          java-version: '17'
+          
+      - name: Grant execute permission
+        run: chmod +x gradlew
+        
+      - name: Build robot code
+        run: ./gradlew build
+        
+      - name: Run Ball Detection Tests
+        env:                
+            CI_NAME: "BallDetection"
+        run: ./gradlew simulateJava | tee ball-detection.log
+
+      - name: Check Test Results
+        run: |
+          # Check for test failures
+          if grep -qE "TEST.*FAILED|Exception|Error" ball-detection.log; then
+            echo "Ball detection tests failed"
+            cat ball-detection.log
+            exit 1
+          fi
+
+          # Check that all tests ran
+          if grep -q "TEST A PASSED" ball-detection.log && \
+             grep -q "TEST B PASSED" ball-detection.log && \
+             grep -q "TEST C PASSED" ball-detection.log && \
+             grep -q "TEST D PASSED" ball-detection.log; then
+            echo "All ball detection tests passed"
+          else
+            echo "Not all tests completed successfully"
+            cat ball-detection.log
+            exit 1
+          fi
+
+      - name: Upload test logs
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: ball-detection-logs
+          path: ball-detection.log

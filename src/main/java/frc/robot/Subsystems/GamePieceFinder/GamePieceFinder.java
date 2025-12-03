@@ -86,9 +86,10 @@ public class GamePieceFinder {
             return; 
         }
 
-        Pose2d robotPose = (testRobotPose != null) 
-            ? testRobotPose 
-            : Drive.getInstance().getPose();
+        // Pose2d robotPose = (testRobotPose != null) 
+        //     ? testRobotPose 
+        //     : Drive.getInstance().getPose();
+        Pose2d robotPose = Drive.getInstance().getPose();
 
         parallaxSamples.add(new GamePieceParallaxSample(robotPose, Milliseconds.of(System.currentTimeMillis()), sample));
 
@@ -244,7 +245,7 @@ public class GamePieceFinder {
 
     private void debugRays(Ray2d r1, Ray2d r2, Translation2d intersection) {
         // Log ray origins
-        Logger.recordOutput("Parallax/Ray1Origin", new Pose2d(r1.origin(), new Rotation2d()));
+        Logger.recordOutput("Parallax/Ray1Origin", new Pose2d(r1.origin(), r1.());
         Logger.recordOutput("Parallax/Ray2Origin", new Pose2d(r2.origin(), new Rotation2d()));
         
         // Log ray endpoints (origin + direction * length)

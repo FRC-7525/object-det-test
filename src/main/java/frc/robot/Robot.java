@@ -38,7 +38,6 @@ public class Robot extends LoggedRobot {
     GamePieceFinder.getInstance().periodic();
     if (Robot.isReal()) {
       Vision.getInstance().periodic();
-      System.out.println("lallala");
     }
   }
 

@@ -50,7 +50,7 @@ public class GamePieceFinder {
             double distance = estimateDistanceFromArea(visionSample.getArea());
             
             Transform2d robotToCamera = new Transform2d(CAMERA_OFFSET, CAMERA_ROTATION_OFFSET);
-            Translation2d cameraPos = robotPose.transformBy(robotToCamera).getTranslation();
+            Translation2d cameraPos = robotPose.transformBy(robotToCamera);
             
             double globalAngleRad = robotPose.getRotation().getRadians() 
                                   + CAMERA_ROTATION_OFFSET.getRadians() 

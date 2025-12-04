@@ -49,8 +49,18 @@ public class GamePieceFinder {
             double yawDeg = visionSample.getYaw();
             double distance = estimateDistanceFromArea(visionSample.getArea());
             
-            Transform2d robotToCamera = new Transform2d(CAMERA_OFFSET, CAMERA_ROTATION_OFFSET);
-            Translation2d cameraPos = robotPose.transformBy(robotToCamera);
+            double rx = robotPose.getX();
+            double ry = robotPose.getY();
+            double rtheta = robotPose.getRotation().getRadians();
+
+            double cx = CAMERA_OFFSET.getX();
+            double cy = CAMERA_OFFSET.getY();
+
+            // Rotate the camera offset by the robot heading
+            double cameraX = rx + (cx * Math.cos(rtheta) - cy * Math.sin(rtheta));
+            double cameraY = ry + (cx * Math.sin(rtheta) + cy * Math.cos(rtheta));
+
+            Translation2d cameraPos = new Translation2d(cameraX, cameraY);
             
             double globalAngleRad = robotPose.getRotation().getRadians() 
                                   + CAMERA_ROTATION_OFFSET.getRadians() 
@@ -245,7 +255,7 @@ public class GamePieceFinder {
 
     private void debugRays(Ray2d r1, Ray2d r2, Translation2d intersection) {
         // Log ray origins
-        Logger.recordOutput("Parallax/Ray1Origin", new Pose2d(r1.origin(), r1.());
+        Logger.recordOutput("Parallax/Ray1Origin", new Pose2d(r1.origin(), new Rotation2d()));
         Logger.recordOutput("Parallax/Ray2Origin", new Pose2d(r2.origin(), new Rotation2d()));
         
         // Log ray endpoints (origin + direction * length)

@@ -1,12 +1,14 @@
 package frc.robot.Subsystems.Vision;
 
 import static edu.wpi.first.units.Units.Degrees;
+import static frc.robot.GlobalConstants.Controllers.DRIVER_CONTROLLER;
 import static frc.robot.Subsystems.Vision.VisionConstants.*;
 
 import org.photonvision.PhotonCamera;
 
 import edu.wpi.first.units.measure.Angle;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
+import frc.robot.Subsystems.GamePieceFinder.GamePieceFinder;
 
 public class Vision extends SubsystemBase {
     
@@ -39,9 +41,10 @@ public class Vision extends SubsystemBase {
             var target = result.getBestTarget();
 
             if (target != null) {
-                targetYaw = Degrees.of(target.getYaw());
-                System.out.println(targetYaw.in(Degrees));
+                if (DRIVER_CONTROLLER.getAButtonPressed()) {
+                    GamePieceFinder.getInstance().addVisionSample(target);
+                }
+            }
         }
-    }
     }
 }

@@ -1,12 +1,17 @@
 package frc.robot.Subsystems.GamePieceFinder;
 
 import static edu.wpi.first.units.Units.*;
+import static frc.robot.GlobalConstants.Controllers.DRIVER_CONTROLLER;
 import static frc.robot.Subsystems.Vision.VisionConstants.ROBOT_TO_FRONT_RIGHT_CAMERA_ROTATION;
 import static frc.robot.Subsystems.Vision.VisionConstants.ROBOT_TO_FRONT_RIGHT_CAMERA_TRANSLATION;
 
+import java.util.Deque;
+import java.util.LinkedList;
+import java.util.PriorityQueue;
 import java.util.Queue;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.littletonrobotics.junction.Logger;
 import org.photonvision.targeting.PhotonTrackedTarget;
 
 import edu.wpi.first.math.geometry.Pose2d;
@@ -16,12 +21,13 @@ import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.units.measure.Angle;
 import edu.wpi.first.units.measure.Distance;
 import edu.wpi.first.units.measure.Time;
+import frc.robot.Subsystems.Drive.Drive;
 
 public class GamePieceFinder {
 
-    private static AtomicReference<GamePieceFinder> instance;
+    private static GamePieceFinder instance = new GamePieceFinder();
     
-    private Queue<GamePieceParallaxSample> parallaxSamples;
+    private Queue<GamePieceParallaxSample> parallaxSamples = new LinkedList<>();
     private Queue<GamePieceVisionSample> visionSamples;
 
     private Pose2d estimate;
@@ -51,10 +57,7 @@ public class GamePieceFinder {
     }
 
     public static GamePieceFinder getInstance() {
-        if (instance.get() == null) {
-            instance.set(new GamePieceFinder());
-        }
-        return instance.get();
+        return instance;
     }
 
     private GamePieceFinder() {
@@ -62,18 +65,7 @@ public class GamePieceFinder {
     }
 
     public void addVisionSample(PhotonTrackedTarget sample) {
-        visionSamples.add(new GamePieceVisionSample(Milliseconds.of(System.currentTimeMillis()), sample));
-    }
-
-    public void addDrivePose(Pose2d pose, Time timestamp) {
-        for (GamePieceVisionSample t : visionSamples) {
-            if (Math.abs(t.timestamp.in(Milliseconds) - timestamp.in(Milliseconds)) < ALLOWED_TIMESTAMP_DEVIATION.in(Milliseconds)) {
-                parallaxSamples.add(new GamePieceParallaxSample(pose, timestamp, t.visionSample));
-                visionSamples.remove(t);
-                continue;
-            }
-        }
-
+        parallaxSamples.add(new GamePieceParallaxSample(Drive.getInstance().getPose(), Milliseconds.of(System.currentTimeMillis()), sample));
     }
 
     public Pose2d getLatestGamepieceEstimate() {
@@ -92,7 +84,9 @@ public class GamePieceFinder {
         GamePieceParallaxSample secondSample = firstTempSample.robotPose.getRotation().getDegrees() > secondTempSample.robotPose.getRotation().getDegrees() ? firstTempSample : secondTempSample;
 
         //TODO: Need to make sure there are no weird singularities or smth happening here
-        Angle deltaYaw = Degrees.of(secondSample.robotPose.getRotation().minus(firstSample.robotPose.getRotation()).getDegrees());
+        Angle deltaYaw = Degrees.of(Math.abs(secondSample.robotPose.getRotation().minus(firstSample.robotPose.getRotation()).getDegrees()));
+
+        Logger.recordOutput("PSSTUFF/deltaYaw", deltaYaw.in(Degrees));
 
         Translation2d firstCameraPos = ROBOT_TO_FRONT_RIGHT_CAMERA_TRANSLATION.toTranslation2d();
         //TODO: Need to check if this rotates the right way - should be to the left
@@ -102,10 +96,10 @@ public class GamePieceFinder {
         
         Angle cameraRot = ROBOT_TO_FRONT_RIGHT_CAMERA_ROTATION.getMeasureZ();
         Angle angleOffset = Radians.of(Math.atan2(firstCameraPos.getY(), firstCameraPos.getX()));
-        Angle firstYaw = Degrees.of(firstSample.visionSample.yaw);
-        Angle secondYaw = Degrees.of(secondSample.visionSample.yaw);
+        Angle firstYaw = Degrees.of(-firstSample.visionSample.yaw);
+        Angle secondYaw = Degrees.of(-secondSample.visionSample.yaw);
 
-        //TODO: There's some redudant math here, need to come back and simplify/clean it up later
+        //TODO: There's some redundant math here, need to come back and simplify/clean it up later
         Angle alpha = Radians.of(Math.atan2(vecBtwnCameraPos.getY(), vecBtwnCameraPos.getX()));
         Angle beta = Degrees.of(90 - alpha.in(Degrees));
         Angle A = Degrees.of(cameraRot.in(Degrees) - firstYaw.in(Degrees) - alpha.in(Degrees));
@@ -121,11 +115,53 @@ public class GamePieceFinder {
 
         //This should cancel the rotation of the bot and make the estimated pose of the object have 0 rotation
         //TODO: If it doesn't actually do that then fix it
-        estimate = firstSample.robotPose.plus(new Transform2d(robotToObject, new Rotation2d(-firstSample.robotPose.getX(), -firstSample.robotPose.getY())));
+        estimate = firstSample.robotPose.plus(new Transform2d(robotToObject, firstSample.robotPose.getRotation().times(-1)));
+        Logger.recordOutput("PSSTUFF/estimate", estimate);
+    }
+
+    public void unitTestEstimate(double robotRot, double yaw1, double yaw2) {
+        //TODO: Need to make sure there are no weird singularities or smth happening here
+        Angle deltaYaw = Degrees.of(robotRot);
+
+        Translation2d firstCameraPos = ROBOT_TO_FRONT_RIGHT_CAMERA_TRANSLATION.toTranslation2d();
+        //TODO: Need to check if this rotates the right way - should be to the left
+        Translation2d secondCameraPos = firstCameraPos.rotateAround(Translation2d.kZero, Rotation2d.fromDegrees(deltaYaw.in(Degrees)));
+
+        Translation2d vecBtwnCameraPos = firstCameraPos.minus(secondCameraPos);
+        
+        Angle cameraRot = ROBOT_TO_FRONT_RIGHT_CAMERA_ROTATION.getMeasureZ();
+        Angle angleOffset = Radians.of(Math.atan2(firstCameraPos.getY(), firstCameraPos.getX()));
+        Angle firstYaw = Degrees.of(-yaw1);
+        Angle secondYaw = Degrees.of(-yaw2);
+
+        //TODO: There's some redundant math here, need to come back and simplify/clean it up later
+        Angle alpha = Radians.of(Math.atan2(vecBtwnCameraPos.getY(), vecBtwnCameraPos.getX()));
+        Angle beta = Degrees.of(90 - alpha.in(Degrees));
+        Angle A = Degrees.of(cameraRot.in(Degrees) - firstYaw.in(Degrees) - alpha.in(Degrees));
+        Angle B = Degrees.of(360 - (cameraRot.in(Degrees) - secondYaw.in(Degrees) + angleOffset.in(Degrees) + ((180 - deltaYaw.in(Degrees))/2 - beta.in(Degrees))));
+        Angle C = Degrees.of(180 - A.in(Degrees) - B.in(Degrees));
+
+        //TODO: Need to make sure coordinate system matches (im assuming right is positive and up is positive)
+        Distance b = Meters.of((vecBtwnCameraPos.getDistance(Translation2d.kZero)/Math.sin(C.in(Radians)))*Math.sin(A.in(Radians)));
+        Translation2d robotToObject = new Translation2d(
+            -b.in(Meters)*Math.cos(A.in(Radians) + alpha.in(Radians)) + firstCameraPos.getMeasureX().in(Meters),
+            b.in(Meters)*Math.sin(A.in(Radians) + alpha.in(Radians)) + firstCameraPos.getMeasureY().in(Meters)
+        );
+
+        Logger.recordOutput("PSSTUFF/estimated translation", robotToObject);
     }
 
     public void Periodic() { 
-        if (parallaxSamples.size() > 1) {
+        if (parallaxSamples != null) {
+            Logger.recordOutput("PSSTUFF/Queue_Length", parallaxSamples.size());
+            int index = 0;
+            for (var x : parallaxSamples.stream().toArray()) {
+                Logger.recordOutput("PSSTUFF/Pose" + index, ((GamePieceParallaxSample) x).robotPose);
+                Logger.recordOutput("PSSTUFF/Yaw" + index, ((GamePieceParallaxSample) x).visionSample.yaw);
+                index++;
+            }
+        }
+        if (DRIVER_CONTROLLER.getBButtonPressed()) {
             updateEstimate();
         }
     }

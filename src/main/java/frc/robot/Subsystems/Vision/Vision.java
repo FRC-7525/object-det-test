@@ -7,14 +7,15 @@ import org.photonvision.PhotonCamera;
 
 import edu.wpi.first.units.measure.Angle;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
+import frc.robot.Subsystems.GamePieceFinder.GamePieceFinder;
 
 public class Vision extends SubsystemBase {
     
     private PhotonCamera camera;
     private static Vision instance;
 
-    private Angle targetYaw;
-
+    private Angle targetYaw; 
+    
     public static Vision getInstance() {
         if (instance == null) {
             instance = new Vision(FRONT_RIGHT_CAM_NAME);
@@ -37,10 +38,9 @@ public class Vision extends SubsystemBase {
 
         for (var result : results) {
             var target = result.getBestTarget();
-
             if (target != null) {
+                GamePieceFinder.getInstance().addVisionSample(target);
                 targetYaw = Degrees.of(target.getYaw());
-                System.out.println(targetYaw.in(Degrees));
             }
         }
     }

@@ -25,18 +25,18 @@ public class Robot extends LoggedRobot {
    * initialization code.
    */
   public Robot() {
-		Drive.getInstance().zeroGyro();
+		// Drive.getInstance().zeroGyro();
     Logger.addDataReceiver(new NT4Publisher());
     Logger.start();
 
-    GamePieceFinder.getInstance().unitTestEstimate(54.4, 8.9, 67.3);
+    GamePieceFinder.getInstance().unitTestEstimate(62.4, 25.5, 84.1);
   }
 
   @Override
   public void robotPeriodic() {
 		CommandScheduler.getInstance().run();
     Vision.getInstance().periodic();
-    Drive.getInstance().periodic();
+    // Drive.getInstance().periodic();
     GamePieceFinder.getInstance().Periodic();
   }
 

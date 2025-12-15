@@ -127,25 +127,27 @@ public class GamePieceFinder {
         //TODO: Need to check if this rotates the right way - should be to the left
         Translation2d secondCameraPos = firstCameraPos.rotateAround(Translation2d.kZero, Rotation2d.fromDegrees(deltaYaw.in(Degrees)));
 
-        Translation2d vecBtwnCameraPos = firstCameraPos.minus(secondCameraPos);
-        
+        Translation2d vecBtwnCameraPos = secondCameraPos.minus(firstCameraPos);
+
         Angle cameraRot = ROBOT_TO_FRONT_RIGHT_CAMERA_ROTATION.getMeasureZ();
-        Angle angleOffset = Radians.of(Math.atan2(firstCameraPos.getY(), firstCameraPos.getX()));
+        Angle angleOffset = Radians.of(Math.atan(firstCameraPos.getY() / firstCameraPos.getX()));
         Angle firstYaw = Degrees.of(-yaw1);
         Angle secondYaw = Degrees.of(-yaw2);
 
         //TODO: There's some redundant math here, need to come back and simplify/clean it up later
-        Angle alpha = Radians.of(Math.atan2(vecBtwnCameraPos.getY(), vecBtwnCameraPos.getX()));
-        Angle beta = Degrees.of(90 - alpha.in(Degrees));
-        Angle A = Degrees.of(cameraRot.in(Degrees) - firstYaw.in(Degrees) - alpha.in(Degrees));
-        Angle B = Degrees.of(360 - (cameraRot.in(Degrees) - secondYaw.in(Degrees) + angleOffset.in(Degrees) + ((180 - deltaYaw.in(Degrees))/2 - beta.in(Degrees))));
+        Angle alpha = Radians.of(Math.atan(vecBtwnCameraPos.getY() / vecBtwnCameraPos.getX()));
+
+        Angle beta = Degrees.of(90 + alpha.in(Degrees));
+        Angle A = Degrees.of(cameraRot.in(Degrees) - firstYaw.in(Degrees) + alpha.in(Degrees));
+        Angle B = Degrees.of(360 - (cameraRot.in(Degrees) - secondYaw.in(Degrees) + angleOffset.in(Degrees) + ((180 - deltaYaw.in(Degrees))/2 - beta.in(Degrees)) + beta.in(Degrees)));
         Angle C = Degrees.of(180 - A.in(Degrees) - B.in(Degrees));
 
         //TODO: Need to make sure coordinate system matches (im assuming right is positive and up is positive)
-        Distance b = Meters.of((vecBtwnCameraPos.getDistance(Translation2d.kZero)/Math.sin(C.in(Radians)))*Math.sin(A.in(Radians)));
+        Distance b = Meters.of((vecBtwnCameraPos.getDistance(Translation2d.kZero)/Math.sin(C.in(Radians)))*Math.sin(B.in(Radians)));
+
         Translation2d robotToObject = new Translation2d(
-            -b.in(Meters)*Math.cos(A.in(Radians) + alpha.in(Radians)) + firstCameraPos.getMeasureX().in(Meters),
-            b.in(Meters)*Math.sin(A.in(Radians) + alpha.in(Radians)) + firstCameraPos.getMeasureY().in(Meters)
+            -(b.in(Meters)*Math.cos(A.in(Radians) - alpha.in(Radians)) + firstCameraPos.getMeasureX().in(Meters)),
+            b.in(Meters)*Math.sin(A.in(Radians) - alpha.in(Radians)) - firstCameraPos.getMeasureY().in(Meters)
         );
 
         Logger.recordOutput("PSSTUFF/estimated translation", robotToObject);

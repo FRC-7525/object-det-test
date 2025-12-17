@@ -77,45 +77,33 @@ public class GamePieceFinder {
         GamePieceParallaxSample firstTempSample = parallaxSamples.poll(); //TODO: Am I good to remove the samples here?
         GamePieceParallaxSample secondTempSample = parallaxSamples.poll();
 
-        //I need the "first" sample to have the smaller rotation so that I can set it as 0 and go off of that for calculations
+        
+//I need the "first" sample to have the smaller rotation so that I can set it as 0 and go off of that for calculations
         //TODO: Logic will mess up if rotation can be negative
         //TODO: Probably better way to implement this logic lol
         GamePieceParallaxSample firstSample = firstTempSample.robotPose.getRotation().getDegrees() < secondTempSample.robotPose.getRotation().getDegrees() ? firstTempSample : secondTempSample;
         GamePieceParallaxSample secondSample = firstTempSample.robotPose.getRotation().getDegrees() > secondTempSample.robotPose.getRotation().getDegrees() ? firstTempSample : secondTempSample;
-
         //TODO: Need to make sure there are no weird singularities or smth happening here
         Angle deltaYaw = Degrees.of(Math.abs(secondSample.robotPose.getRotation().minus(firstSample.robotPose.getRotation()).getDegrees()));
+        Translation2d robotToRobot = secondSample.robotPose.minus(firstSample.robotPose).getTranslation();
 
         Logger.recordOutput("PSSTUFF/deltaYaw", deltaYaw.in(Degrees));
 
         Translation2d firstCameraPos = ROBOT_TO_FRONT_RIGHT_CAMERA_TRANSLATION.toTranslation2d();
         //TODO: Need to check if this rotates the right way - should be to the left
-        Translation2d secondCameraPos = firstCameraPos.rotateAround(Translation2d.kZero, Rotation2d.fromDegrees(deltaYaw.in(Degrees)));
-
-        Translation2d vecBtwnCameraPos = firstCameraPos.minus(secondCameraPos);
+        Translation2d secondCameraPos = firstCameraPos.rotateAround(Translation2d.kZero, Rotation2d.fromDegrees(deltaYaw.in(Degrees))).plus(robotToRobot);
         
         Angle cameraRot = ROBOT_TO_FRONT_RIGHT_CAMERA_ROTATION.getMeasureZ();
-        Angle angleOffset = Radians.of(Math.atan2(firstCameraPos.getY(), firstCameraPos.getX()));
         Angle firstYaw = Degrees.of(-firstSample.visionSample.yaw);
         Angle secondYaw = Degrees.of(-secondSample.visionSample.yaw);
 
-        //TODO: There's some redundant math here, need to come back and simplify/clean it up later
-        Angle alpha = Radians.of(Math.atan2(vecBtwnCameraPos.getY(), vecBtwnCameraPos.getX()));
-        Angle beta = Degrees.of(90 - alpha.in(Degrees));
-        Angle A = Degrees.of(cameraRot.in(Degrees) - firstYaw.in(Degrees) - alpha.in(Degrees));
-        Angle B = Degrees.of(360 - (cameraRot.in(Degrees) - secondYaw.in(Degrees) + angleOffset.in(Degrees) + ((180 - deltaYaw.in(Degrees))/2 - beta.in(Degrees))));
-        Angle C = Degrees.of(180 - A.in(Degrees) - B.in(Degrees));
+        double posX = -(Math.tan(cameraRot.in(Radians) - firstYaw.in(Radians))*firstCameraPos.getX()+firstCameraPos.getY() - Math.tan(cameraRot.in(Radians) - secondYaw.in(Radians) - deltaYaw.in(Radians))*secondCameraPos.getX() - secondCameraPos.getY())/(-Math.tan(cameraRot.in(Radians) - firstYaw.in(Radians)) + Math.tan(cameraRot.in(Radians) - secondYaw.in(Radians) - deltaYaw.in(Radians)));
+        double posY = -Math.tan(cameraRot.in(Radians) - firstYaw.in(Radians))*posX+Math.tan(cameraRot.in(Radians)-firstYaw.in(Radians))*firstCameraPos.getX()+firstCameraPos.getY();
 
-        //TODO: Need to make sure coordinate system matches (im assuming right is positive and up is positive)
-        Distance b = Meters.of((vecBtwnCameraPos.getDistance(Translation2d.kZero)/Math.sin(C.in(Radians)))*Math.sin(A.in(Radians)));
-        Translation2d robotToObject = new Translation2d(
-            -b.in(Meters)*Math.cos(A.in(Radians) + alpha.in(Radians)) + firstCameraPos.getMeasureX().in(Meters),
-            b.in(Meters)*Math.sin(A.in(Radians) + alpha.in(Radians)) + firstCameraPos.getMeasureY().in(Meters)
-        );
+        Translation2d robotToObject = new Translation2d(posX, posY);    
 
         //This should cancel the rotation of the bot and make the estimated pose of the object have 0 rotation
-        //TODO: If it doesn't actually do that then fix it
-        estimate = firstSample.robotPose.plus(new Transform2d(robotToObject, firstSample.robotPose.getRotation().times(-1)));
+        estimate = firstSample.robotPose.plus(new Transform2d(robotToObject, new Rotation2d()));
         Logger.recordOutput("PSSTUFF/estimate", estimate);
     }
 
@@ -153,7 +141,35 @@ public class GamePieceFinder {
         Logger.recordOutput("PSSTUFF/estimated translation", robotToObject);
     }
 
-    public void Periodic() { 
+    public void unitTestEstimateOtherMethod(Pose2d pos1, Pose2d pos2, double yaw1, double yaw2) {
+        Translation2d robotToRobot = pos2.minus(pos1).getTranslation();
+
+        Rotation2d greaterRot = pos1.getRotation().getDegrees() > pos2.getRotation().getDegrees() ? pos1.getRotation() : pos2.getRotation();
+        Rotation2d lesserRot = pos1.getRotation().getDegrees() > pos2.getRotation().getDegrees() ? pos2.getRotation() : pos1.getRotation();
+        //TODO: Need to make sure there are no weird singularities or smth happening here
+        Angle deltaYaw = Degrees.of(greaterRot.minus(lesserRot).getDegrees());
+
+        System.out.println(greaterRot);
+
+        Translation2d firstCameraPos = ROBOT_TO_FRONT_RIGHT_CAMERA_TRANSLATION.toTranslation2d();
+        //TODO: Need to check if this rotates the right way - should be to the left
+        Translation2d secondCameraPos = firstCameraPos.rotateAround(Translation2d.kZero, Rotation2d.fromDegrees(deltaYaw.in(Degrees))).plus(robotToRobot);
+
+        Angle cameraRot = ROBOT_TO_FRONT_RIGHT_CAMERA_ROTATION.getMeasureZ();
+        Angle firstYaw = Degrees.of(-yaw1);
+        Angle secondYaw = Degrees.of(-yaw2);
+
+        double posX = -(Math.tan(cameraRot.in(Radians) - firstYaw.in(Radians))*firstCameraPos.getX()+firstCameraPos.getY() - Math.tan(cameraRot.in(Radians) - secondYaw.in(Radians) - deltaYaw.in(Radians))*secondCameraPos.getX() - secondCameraPos.getY())/(-Math.tan(cameraRot.in(Radians) - firstYaw.in(Radians)) + Math.tan(cameraRot.in(Radians) - secondYaw.in(Radians) - deltaYaw.in(Radians)));
+        double posY = -Math.tan(cameraRot.in(Radians) - firstYaw.in(Radians))*posX+Math.tan(cameraRot.in(Radians)-firstYaw.in(Radians))*firstCameraPos.getX()+firstCameraPos.getY();
+
+        Translation2d robotToObject = new Translation2d(posX, posY);
+
+        System.out.println(robotToObject);
+
+        Logger.recordOutput("PSSTUFF/estimated translation", robotToObject);
+    }
+
+    public void Periodic() {
         if (parallaxSamples != null) {
             Logger.recordOutput("PSSTUFF/Queue_Length", parallaxSamples.size());
             int index = 0;

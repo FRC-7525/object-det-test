@@ -8,6 +8,9 @@ import org.littletonrobotics.junction.LoggedRobot;
 import org.littletonrobotics.junction.Logger;
 import org.littletonrobotics.junction.networktables.NT4Publisher;
 
+import edu.wpi.first.math.geometry.Pose2d;
+import edu.wpi.first.math.geometry.Rotation2d;
+import edu.wpi.first.math.util.Units;
 import edu.wpi.first.wpilibj.TimedRobot;
 import edu.wpi.first.wpilibj2.command.CommandScheduler;
 import frc.robot.Subsystems.Drive.Drive;
@@ -29,7 +32,7 @@ public class Robot extends LoggedRobot {
     Logger.addDataReceiver(new NT4Publisher());
     Logger.start();
 
-    GamePieceFinder.getInstance().unitTestEstimate(62.4, 25.5, 84.1);
+    GamePieceFinder.getInstance().unitTestEstimateOtherMethod(new Pose2d(-1, 0.0, new Rotation2d()), new Pose2d(1.23, 1.93, new Rotation2d(Units.degreesToRadians(49.3))), 109.117483133, 158.859747818);
   }
 
   @Override
